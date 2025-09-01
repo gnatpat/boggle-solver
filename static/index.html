@@ -1,0 +1,35 @@
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Boggle OCR</title>
+        <link rel="stylesheet" href="/static/style.css" />
+    </head>
+    <body>
+        <div id="root">
+            <h1>Boggle OCR</h1>
+            <div class="controls">
+                <button id="start-camera">Start Camera</button>
+                <button id="capture-ocr" style="display: none;">Capture + OCR</button>
+            </div>
+            <div class="video-container">
+                <video class="video-preview" autoplay></video>
+                <svg class="overlay">
+                    <defs>
+                        <pattern id="grid" width="25%" height="25%" patternUnits="userSpaceOnUse">
+                            <rect width="100%" height="100%" fill="none" stroke="red" stroke-width="2" shape-rendering="crispEdges"/>
+                        </pattern>
+                    </defs>
+                    <rect x="0" y="0" width="100%" height="100%" fill="url(#grid)" />
+                    <line x1="100%" y1="0" x2="100%" y2="100%" stroke="red" stroke-width="2" />
+                    <line x1="0" y1="100%" x2="100%" y2="100%" stroke="red" stroke-width="2" />
+
+                </svg>
+            </div>
+        </div>
+        <details id="debug-info">
+            <summary>Debug Info</summary>
+        </details>
+    </body>
+    <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+    <script src="/static/script.js"></script>
+</html>
