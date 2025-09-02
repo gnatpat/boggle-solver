@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Boggle Labeling Tool</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+        }
+
+        img {
+            border: 1px solid #ccc;
+            max-width: 200px;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        #entered {
+            font-size: 48px;
+        }
+
+        .keyboard button {
+            margin: 2px;
+            padding: 8px;
+        }
+
+        #progress {
+            margin: 10px 0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Boggle Labeling Tool</h1>
+
+    <div id="progress">Progress: …</div>
+
+    <img id="image" src="" alt="letter" />
+    <div id="entered"></div>
+    <div id="filename"></div>
+
+    <button id="refreshBtn">🔄 Refresh Files</button>
+
+    <script>
+        let currentImageId = null;
+        let previousImageId = null;
+        let entered = null;
+
+        async function fetchProgress() {
+            const res = await fetch("/progress");
+            const data = await res.json();
+            const el = document.getElementById("progress");
+            el.textContent = `Progress: ${data.labeled}/${data.total} labeled (${data.remaining} remaining)`;
+            if (data.done) {
+                el.textContent += " ✅ All done!";
+            }
+        }
+
+        async function loadNext() {
+            previousImageId = currentImageId;
+            const res = await fetch("/next");
+            const data = await res.json();
+            console.log(data)
+            if (data.done) {
+                document.getElementById("image").style.display = "none";
+                document.getElementById("filename").textContent = "All images labeled!";
+                fetchProgress();
+                return;
+            }
+            currentImageId = data.image_id;
+            document.getElementById("image").src = data.raw_path;
+            document.getElementById("filename").textContent = data.raw_path;
+            fetchProgress();
+        }
+
+        async function sendLabel(label) {
+            console.log(currentImageId)
+            if (!currentImageId) return;
+            await fetch(`/label/${currentImageId}/${label}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+            });
+            loadNext();
+        }
+
+        document.getElementById("refreshBtn").onclick = async () => {
+            await fetch("/refresh");
+            loadNext();
+        };
+
+        // Keyboard shortcuts: press A–Z or ? to label quickly
+        document.addEventListener("keydown", async (e) => {
+            if (e.repeat) return; // ignore repeats
+            // if modifier key is pressed, ignore
+            if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+            const k = e.key.toUpperCase();
+            if (/^[A-Z?]$/.test(k)) {
+                entered = k;
+                document.querySelector("#entered").textContent = entered;
+                // send label after small delay
+                setTimeout(async () => {
+                    if (entered) {
+                        await sendLabel(entered);
+                    }
+                    entered = null;
+                    document.querySelector("#entered").textContent = "";
+                }, 300);
+            }
+            // if backspace, clear the entered label
+            if (e.key === "Backspace") {
+                if (entered) {
+                    document.querySelector("#entered").textContent = "";
+                    entered = null;
+                } else {
+                    // use previous image id
+                    if (previousImageId) {
+                        currentImageId = previousImageId;
+                        previousImageId = null;
+                        const res = await fetch(`/image_id/${currentImageId}`);
+                        const data = await res.json();
+                        document.getElementById("image").src = data.raw_path;
+                        document.getElementById("filename").textContent = data.raw_path;
+                    }
+                }
+            }
+        });
+
+        loadNext();
+    </script>
+</body>
+
+</html>

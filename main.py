@@ -3,12 +3,12 @@ import json
 import os
 from pathlib import Path
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import uuid
-from fastapi import FastAPI, File, Request
+from fastapi import BackgroundTasks, FastAPI, File, Request
 from fastapi.concurrency import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from starlette.datastructures import UploadFile
 
 from attrs import frozen, define
@@ -25,26 +25,45 @@ def load_labels(app: FastAPI):
         app.state.labels = {}
 
 
-def save_labels(app: FastAPI):
+def save_labels(labels: Dict[str, str]):
     with open(LABELS_FILE, "w") as f:
-        json.dump(app.state.labels, f, indent=2)
+        json.dump(labels, f, indent=2)
 
 
 def refresh_files(app: FastAPI):
     # use glob to find all image files
-    app.state.files = [
-        f for f in glob(str(IMAGE_DIR / "*_raw.png"))
-        if os.path.isfile(f)
-    ]
+    app.state.image_ids = []
+    filepaths = glob(str(IMAGE_DIR / "*_raw.png"))
+    for f in filepaths:
+        if not os.path.isfile(f):
+            continue
+        basepath = os.path.basename(f)
+        image_id = get_image_id(basepath)
+        if image_id:
+            app.state.image_ids.append(image_id)
+    print(app.state.image_ids)
+
+def get_image_id(filename: str) -> Optional[str]:
+    match = re.match(r"(\w+)_raw\.png", filename)
+    if match:
+        return match.group(1)
+    return None
+
+def get_image_filepaths(image_id: str) -> Tuple[str, str]:
+    raw_path = IMAGE_DIR / f"{image_id}_raw.png"
+    processed_path = IMAGE_DIR / f"{image_id}_processed.png"
+    return '/' + str(raw_path), '/' + str(processed_path)
+
 
 @asynccontextmanager
 async def lifespan(app):
     load_labels(app)
     refresh_files(app)
     yield
-    save_labels(app)
+    save_labels(app.state.labels)
 
 app = FastAPI(lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 async def index():
@@ -91,4 +110,52 @@ async def upload_images(request: Request):
         with open(IMAGE_DIR / processed_filename, "wb") as f:
             f.write(processed_contents)
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/refresh")
+async def refresh():
+    refresh_files(app)
+    return {"count": len(app.state.image_ids)}
+
+@app.get("/progress")
+async def progress():
+    total = len(app.state.image_ids)
+    labeled = len(app.state.labels)
+    return {
+        "labeled": labeled,
+        "total": total,
+        "remaining": total - labeled if total else 0,
+        "done": total > 0 and labeled >= total,
+    }
+
+@app.get("/next")
+async def next_image():
+    for image_id in app.state.image_ids:
+        if image_id not in app.state.labels:
+            raw_path, processed_path = get_image_filepaths(image_id)
+            return {"image_id": image_id, "raw_path": raw_path, "processed_path": processed_path}
+    return {"done": True}
+
+@app.get("/image_id/{image_id}")
+async def get_image_details(image_id: str):
+    if image_id in app.state.labels:
+        raw_path, processed_path = get_image_filepaths(image_id)
+        return {"image_id": image_id, "label": app.state.labels[image_id], "raw_path": raw_path, "processed_path": processed_path}
+    return {"error": "Image not found"}, 404
+
+@app.get("/images/{filename}")
+async def get_image(filename: str):
+    path = os.path.join(IMAGE_DIR, filename)
+    return FileResponse(path)
+
+@app.post("/label/{image_id}/{label}")
+async def label_image(image_id: str, label: str, background_tasks: BackgroundTasks):
+    if image_id not in app.state.image_ids:
+        return {"error": "Image not found"}, 404
+    # ensure label is A-Z and ? in uppercase
+    label = label.upper()
+    if not re.match(r"^[A-Z?]$", label):
+        return {"error": "Invalid label"}, 400
+    app.state.labels[image_id] = label
+    # save labels as background task
+    background_tasks.add_task(save_labels, app.state.labels)
+    return {"status": "success"}
