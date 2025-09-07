@@ -11,3 +11,4 @@ trie_data.*
 words.txt
 words_alpha.txt
 notebook.ipynb
+release.sh

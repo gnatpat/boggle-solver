@@ -868,7 +868,7 @@ function startTimer(startFromPaused = false) {
 }
 
 function getDisplayTime(time) {
-    const seconds = Math.floor(time / 1000);
+    const seconds = Math.ceil(time / 1000);
     const minutes = Math.floor(seconds / 60);
     const displaySeconds = seconds % 60;
     return `${minutes}:${displaySeconds.toString().padStart(2, '0')}`;
