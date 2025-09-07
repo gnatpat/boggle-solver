@@ -4,10 +4,7 @@ Live at https://natpat.net/boggle
 
 A Web App for solving Boggle Boards. No server-side processing is required - everything runs **in browser**.
 
-<details>
-<summary>Demo Screenshot</summary>
 ![Demo Screenshot](https://github.com/gnatpat/boggle-solver/blob/main/readme_assets/1000041431.png?raw=true)
-</details>
 
 ## Overview
 Technologies used:
