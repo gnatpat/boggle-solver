@@ -45,7 +45,7 @@ The Web App can be served by serving everything in the `static/` directory. For 
 uv run fastapi dev main.py --port 8000
 ```
 
-And navigate to `http://localhost:8000/static/index` to see the app.
+And navigate to `http://localhost:8000/` to see the app.
 
 #### Prerequisites
 

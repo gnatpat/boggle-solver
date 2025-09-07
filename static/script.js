@@ -36,8 +36,7 @@ async function startCamera() {
     document.querySelector('#results').innerHTML = '';
     document.querySelector('#solve-button-container').style.display = "none";
     document.querySelector('#boggle-board').style.display = "none";
-    currentAnimation = null;
-    hidePathCanvas();
+    clearHighlightedWord();
     boardSolved = false;
     predictions = [];
 }
@@ -431,8 +430,7 @@ function renderBoard() {
         setTileText(tile, prediction, x, y, gridSize);
         board.appendChild(tile);
         tile.onclick = () => {
-            hidePathCanvas();
-            highlightWord([]);
+            clearHighlightedWord();
             tileText.textContent = '';
             const input = document.createElement('input');
             input.type = 'text';
@@ -444,14 +442,11 @@ function renderBoard() {
                     setTileText(tile, val, x, y, gridSize);
                     predictions[y * gridSize + x] = val;
                     if (boardSolved) {
-                        console.log('resolving');
-                        boardSolved = false;
                         document.querySelector('#results').innerHTML = '';
                         solveBoard();
-                        console.log('resolved');
                     }
                 } else {
-                    setTileText(tile, prediction, x, y, gridSize);
+                    setTileText(tile, predictions[y * gridSize + x], x, y, gridSize);
                 }
                 console.log('removing');
                 tile.removeChild(input);
@@ -475,11 +470,13 @@ function renderBoard() {
             }
             tile.appendChild(input);
             input.focus();
-            input.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-            // scroll into view after a short delay to allow for rendering
-            setTimeout(() => {
-                input.scrollIntoView({ block: "center", inline: "center" });
-            }, 100);
+            if (!boardSolved) {
+                input.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+                // scroll into view after a short delay to allow for rendering
+                setTimeout(() => {
+                    input.scrollIntoView({ block: "center", inline: "center" });
+                }, 100);
+            }
         };
         console.log(x, y, prediction);
     }
@@ -581,6 +578,7 @@ function findAllWords(board, trie, boardSize) {
 }
 
 function highlightPath(path) {
+    if (!path) return;
     // clear previous highlights
     document.querySelectorAll('.tile-text').forEach(tile => {
         tile.classList.remove('highlight');
@@ -603,12 +601,6 @@ function highlightPath(path) {
     canvas.style.left = `${board.offsetLeft}px`;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (path.length === 0) {
-        // highlight all tiles
-        document.querySelectorAll('.tile-text').forEach(tile => {
-            tile.classList.add('highlight');
-        });
-    }
     const color = 'rgba(53, 117, 253, 1)';
     const radius = 8;
     const lastIndex = path.length - 1;
@@ -727,22 +719,41 @@ function solveBoard() {
             const wordSpan = li.querySelector('.word');
             wordSpan.textContent = entry.word;
             wordSpan.onclick = () => {
-                highlightWord(entry.path);
+                highlightWord(entry);
             };
             ul.appendChild(li);
         });
         resultsDiv.appendChild(section);
     });
+    if (!boardSolved) {
+        const boardElement = document.querySelector('#boggle-board');
+        const topOfBoard = boardElement.getBoundingClientRect().top + window.scrollY;
+        window.scrollTo({ top: topOfBoard, behavior: 'smooth' });
+    }
     boardSolved = true;
     // scroll results into view
-    const boardElement = document.querySelector('#boggle-board');
-    const topOfBoard = boardElement.getBoundingClientRect().top + window.scrollY;
-    window.scrollTo({ top: topOfBoard, behavior: 'smooth' });
 }
 
-function highlightWord(path) {
+function highlightWord(entry) {
+    const path = entry.path;
+    const word = entry.word;
     highlightPath(path);
     startAnimation(path);
+    document.querySelector('#current-path-info').style.display = 'flex';
+    const wordLength = word.length;
+    document.querySelector('#highlighted-word').textContent = `${word} (${wordLength})`;
+}
+
+function clearHighlightedWord() {
+    // highlight all tiles
+    document.querySelectorAll('.tile-text').forEach(tile => {
+        tile.classList.add('highlight');
+    });
+    hidePathCanvas();
+    if (currentAnimation) {
+        currentAnimation.stopped = true;
+    }
+    document.querySelector('#current-path-info').style.display = 'none';
 }
 
 // Simple sleep helper
@@ -758,8 +769,8 @@ async function animateWordPath(path, controller, delay = 200, pause = 1000) {
     while (!controller.stopped) {
         // Highlight tiles in order
         for (const [x, y] of path) {
-            const tile = getTileTextTag(x, y);
             if (controller.stopped) break;
+            const tile = getTileTextTag(x, y);
             tile.classList.add('animation-highlight');
             // remove after slightly longer delay
             window.setTimeout(() => {
@@ -934,6 +945,7 @@ window.onload = async function () {
     document.querySelector('#start-camera').onclick = startCamera;
     document.querySelector('#capture-ocr').onclick = captureOCR;
     document.querySelector('#boggle-size').onchange = updateOverlay;
+    document.querySelector('#clear-path').onclick = clearHighlightedWord;
     document.querySelector('#start-timer').onclick = function() {
         startTimer();
     }

@@ -9,7 +9,7 @@ import uuid
 from fastapi import BackgroundTasks, FastAPI, File, Request
 from fastapi.concurrency import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from starlette.datastructures import UploadFile
 
 from attrs import frozen, define
@@ -67,8 +67,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 async def index():
-    # serve index.html
-    return HTMLResponse(open("static/index.html").read())
+    # redirect to /static/index.html
+    return RedirectResponse(url="/static/index.html")
 
 @define
 class ImagePair:

@@ -21,6 +21,7 @@
                 </ol>
                 <p style="text-align: left;"><b>Note:</b> This app works best in well-lit conditions with a clear view of the board.</p>
                 <p style="text-align: left;">A timer is also included for use when playing Boggle!</p>
+                <p style="text-align: left;">This project is open source. The code is available on <a href="https://github.com/gnatpat/boggle-solver">GitHub</a>.</p>
             </details>
             <details class="top-details" id="timer-details">
                 <summary>Timer</summary>
@@ -71,6 +72,10 @@
             <div id="boggle-board-container">
                 <div id="boggle-board"></div>
                 <canvas id="path-canvas"></canvas>
+                <div id="current-path-info" style="display: none;">
+                    <div id="highlighted-word"></div>
+                    <button id="clear-path">Clear</button> 
+                </div>
             </div>
             <div id="solve-button-container" style="display: none;">
                 <div id="instructions">Tap a letter to edit</div>
