@@ -6,9 +6,10 @@ A Web App for solving Boggle Boards. No server-side processing is required - eve
 
 <details>
 <summary>Demo Screenshot</summary>
-[![Demo Screenshot](./readme_assets/1000041431.png)](https://natpat.net/boggle)
+![Demo Screenshot](https://github.com/gnatpat/boggle-solver/blob/main/readme_assets/1000041431.png?raw=true)
 </details>
 
+## Overview
 Technologies used:
 - FastAPI
 - PyTorch
