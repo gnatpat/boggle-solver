@@ -42,7 +42,6 @@
                     <option value="4x4">Boggle (4x4)</option>
                     <option value="5x5">Big Boggle (5x5)</option>
                 </select>
-                <button id="capture-ocr" style="display: none;"></button>
                 <button id="hard-reload" onclick="location.reload();" style="display: none;">Hard Reload</button>
             </div>
             <div class="video-container">
@@ -87,6 +86,9 @@
         <details id="debug-info" style="display: none;">
             <summary>Debug Info</summary>
         </details>
+        <button id="capture-ocr" style="display: none;">
+            <img id="capture-ocr-icon" src="camera.svg" alt="Capture" />
+        </button>
     </body>
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/ort.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pako@2.0.4/dist/pako.min.js"></script>
