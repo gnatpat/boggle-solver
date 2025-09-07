@@ -1,35 +1,98 @@
 <html>
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Boggle OCR</title>
-        <link rel="stylesheet" href="/static/style.css" />
+        <title>Boggle Solver</title>
+        <link rel="stylesheet" href="style.css" />
     </head>
     <body>
         <div id="root">
-            <h1>Boggle OCR</h1>
+            <h1>Boggle Solver</h1>
+            <details id="what-is-this" class="top-details">
+                <summary>What is this?</summary>
+                <p style="text-align: left;"><b>Boggle Solver</b> lets you find words on a Boggle board using your device's camera. It runs completely in your browser; no images are sent to a server.</p>
+                <ol style="text-align: left;">
+                    <li>Click "Start Camera" and allow camera access</li>
+                    <li>Hold your phone or webcam over a Boggle or Big Boggle board</li>
+                    <li>Select the correct board size from the dropdown</li>
+                    <li>Take a picture; the letters will be recognized automatically</li>
+                    <li>If any letters are incorrect, tap them to edit</li>
+                    <li>Click "Find Words" to see all possible words on the board</li>
+                    <li>Tap any word to see its position on the board</li>
+                </ol>
+                <p style="text-align: left;"><b>Note:</b> This app works best in well-lit conditions with a clear view of the board.</p>
+                <p style="text-align: left;">A timer is also included for use when playing Boggle!</p>
+            </details>
+            <details class="top-details" id="timer-details">
+                <summary>Timer</summary>
+                <div id="timer">
+                    <span id="time-remaining">03:00</span>
+                    <button id="start-timer">Start Timer</button>
+                    <button id="pause-timer" style="display: none;">Pause</button>
+                    <button id="resume-timer" style="display: none;">Resume</button>
+                    <button id="reset-timer" style="display: none;">Reset</button>
+                    <audio id="timer-sound" src="timer-end-sound.mp3" preload="auto"></audio>
+                </div>
+                <div id="timer-instructions">This timer won't work if you lock your device or switch tabs.</div>
+            </details>
             <div class="controls">
+                <!-- choose between boggle (4x4) and big boggle (5x5)-->
                 <button id="start-camera">Start Camera</button>
-                <button id="capture-ocr" style="display: none;">Capture + OCR</button>
+                <select id="boggle-size" disabled="true">
+                    <option value="4x4">Boggle (4x4)</option>
+                    <option value="5x5">Big Boggle (5x5)</option>
+                </select>
+                <button id="capture-ocr" style="display: none;"></button>
+                <button id="hard-reload" onclick="location.reload();" style="display: none;">Hard Reload</button>
             </div>
             <div class="video-container">
-                <video class="video-preview" autoplay></video>
-                <svg class="overlay">
+                <video class="video-preview" autoplay muted playsinline webkit-playsinline></video>
+                <canvas class="snapshot-canvas" style="display: none;"></canvas>
+                <svg class="overlay4x4" display="none">
                     <defs>
                         <pattern id="grid" width="25%" height="25%" patternUnits="userSpaceOnUse">
-                            <rect width="100%" height="100%" fill="none" stroke="red" stroke-width="2" shape-rendering="crispEdges"/>
+                            <rect width="100%" height="100%" fill="none" stroke="green" stroke-width="3" shape-rendering="crispEdges"/>
                         </pattern>
                     </defs>
                     <rect x="0" y="0" width="100%" height="100%" fill="url(#grid)" />
-                    <line x1="100%" y1="0" x2="100%" y2="100%" stroke="red" stroke-width="2" />
-                    <line x1="0" y1="100%" x2="100%" y2="100%" stroke="red" stroke-width="2" />
-
+                    <line x1="100%" y1="0" x2="100%" y2="100%" stroke="green" stroke-width="3" />
+                    <line x1="0" y1="100%" x2="100%" y2="100%" stroke="green" stroke-width="3" />
+                </svg>
+                <svg class="overlay5x5" display="none">
+                    <defs>
+                        <pattern id="grid5x5" width="20%" height="20%" patternUnits="userSpaceOnUse">
+                            <rect width="100%" height="100%" fill="none" stroke="green" stroke-width="3" shape-rendering="crispEdges"/>
+                        </pattern>
+                    </defs>
+                    <rect x="0" y="0" width="100%" height="100%" fill="url(#grid5x5)" />
+                    <line x1="100%" y1="0" x2="100%" y2="100%" stroke="green" stroke-width="3" />
+                    <line x1="0" y1="100%" x2="100%" y2="100%" stroke="green" stroke-width="3" />
                 </svg>
             </div>
+            <div id="boggle-board-container">
+                <div id="boggle-board"></div>
+                <canvas id="path-canvas"></canvas>
+            </div>
+            <div id="solve-button-container" style="display: none;">
+                <div id="instructions">Tap a letter to edit</div>
+                <button id="solve-button">Find Words</button>
+            </div>
+            <div id="results">
+            </div>
         </div>
-        <details id="debug-info">
+        <details id="debug-info" style="display: none;">
             <summary>Debug Info</summary>
         </details>
     </body>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/ort.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.0.4/dist/pako.min.js"></script>
     <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
-    <script src="/static/script.js"></script>
+    <script src="script.js"></script>
+    <template id="word-length-section">
+        <h2 class="word-length"></h2>
+        <ul class="word-list"></ul>
+    </template>
+    <template id="word-entry">
+        <li class="word-entry"><a class="word"></a></li>
+    </template>
 </html>
+

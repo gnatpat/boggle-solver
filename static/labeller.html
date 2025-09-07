@@ -11,7 +11,7 @@
             margin: 20px;
         }
 
-        img {
+        #image {
             border: 1px solid #ccc;
             max-width: 200px;
             display: block;
@@ -31,6 +31,21 @@
             margin: 10px 0;
             font-weight: bold;
         }
+
+        .image-and-label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .label {
+            font-weight: bold;
+            margin-left: 10px;
+            margin-top: auto;
+            margin-bottom: auto;
+            font-size: 48px;
+            height: fit-content;
+        }
     </style>
 </head>
 
@@ -39,11 +54,16 @@
 
     <div id="progress">Progress: …</div>
 
-    <img id="image" src="" alt="letter" />
-    <div id="entered"></div>
-    <div id="filename"></div>
+    <div id="imageAndLabel" class="image-and-label">
+        <img id="image" src="" alt="letter" />
+        <div id="entered" class="label"></div>
+    </div>
 
+    <div id="filename"></div>
     <button id="refreshBtn">🔄 Refresh Files</button>
+
+    <button id="viewToggle">See All</button>
+    <div id="imageList"></div>
 
     <script>
         let currentImageId = null;
@@ -71,20 +91,28 @@
                 fetchProgress();
                 return;
             }
+            setCurrentImage(data);
+            fetchProgress();
+        }
+
+        function setCurrentImage(data) {
             currentImageId = data.image_id;
             document.getElementById("image").src = data.raw_path;
             document.getElementById("filename").textContent = data.raw_path;
-            fetchProgress();
         }
 
         async function sendLabel(label) {
             console.log(currentImageId)
             if (!currentImageId) return;
+            // encode the label in case it's a question mark
+            if (label === "?") {
+                label = encodeURIComponent(label);
+            }
             await fetch(`/label/${currentImageId}/${label}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
             });
-            loadNext();
+            await loadNext();
         }
 
         document.getElementById("refreshBtn").onclick = async () => {
@@ -96,7 +124,7 @@
         document.addEventListener("keydown", async (e) => {
             if (e.repeat) return; // ignore repeats
             // if modifier key is pressed, ignore
-            if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+            if (e.altKey || e.ctrlKey || e.metaKey) return;
             const k = e.key.toUpperCase();
             if (/^[A-Z?]$/.test(k)) {
                 entered = k;
@@ -122,12 +150,54 @@
                         previousImageId = null;
                         const res = await fetch(`/image_id/${currentImageId}`);
                         const data = await res.json();
-                        document.getElementById("image").src = data.raw_path;
-                        document.getElementById("filename").textContent = data.raw_path;
+                        setCurrentImage(data);
                     }
                 }
             }
         });
+
+        document.querySelector("#viewToggle").onclick = async () => {
+            const list = document.getElementById("imageList");
+            if (list.style.display === "block") {
+                list.style.display = "none";
+                document.querySelector("#viewToggle").textContent = "See All";
+            } else {
+                list.style.display = "block";
+                document.querySelector("#viewToggle").textContent = "Hide All";
+                // Load all images into the list
+                await loadAllImages();
+            }
+        };
+
+        async function loadAllImages() {
+            const res = await fetch("/images");
+            const data = await res.json();
+            const list = document.getElementById("imageList");
+            list.innerHTML = "";
+            for (const image of data.images) {
+                const item = document.createElement("div");
+                const idDiv = document.createElement('div')
+                idDiv.textContent = `ID: ${image.image_id}`;
+                item.appendChild(idDiv);
+                const imageAndLabel = document.createElement('div');
+                imageAndLabel.classList.add("image-and-label");
+                const img = document.createElement("img");
+                img.src = image.raw_path;
+                imageAndLabel.appendChild(img);
+                const labelSpan = document.createElement('span');
+                labelSpan.textContent = `${image.label || "-"}`;
+                labelSpan.classList.add("label");
+                imageAndLabel.appendChild(labelSpan);
+                item.appendChild(imageAndLabel);
+                const editButton = document.createElement("button");
+                editButton.textContent = "Edit";
+                editButton.onclick = () => {
+                    setCurrentImage(image);
+                };
+                item.appendChild(editButton);
+                list.appendChild(item);
+            }
+        }
 
         loadNext();
     </script>

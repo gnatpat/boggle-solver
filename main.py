@@ -1,5 +1,6 @@
 from glob import glob
 import json
+import random
 import os
 from pathlib import Path
 import re
@@ -41,7 +42,6 @@ def refresh_files(app: FastAPI):
         image_id = get_image_id(basepath)
         if image_id:
             app.state.image_ids.append(image_id)
-    print(app.state.image_ids)
 
 def get_image_id(filename: str) -> Optional[str]:
     match = re.match(r"(\w+)_raw\.png", filename)
@@ -80,7 +80,6 @@ async def upload_images(request: Request):
     form = await request.form()
     pairs: Dict[str, ImagePair] = {}
 
-    print(form)
     pattern = re.compile(r"cube(\d+)_(raw|processed)")
     for key, value in form.multi_items():
         if not isinstance(value, UploadFile):
@@ -129,10 +128,11 @@ async def progress():
 
 @app.get("/next")
 async def next_image():
-    for image_id in app.state.image_ids:
-        if image_id not in app.state.labels:
-            raw_path, processed_path = get_image_filepaths(image_id)
-            return {"image_id": image_id, "raw_path": raw_path, "processed_path": processed_path}
+    unlabelled = [image_id for image_id in app.state.image_ids if image_id not in app.state.labels]
+    if unlabelled:
+        image_id = random.choice(unlabelled)
+        raw_path, processed_path = get_image_filepaths(image_id)
+        return {"image_id": image_id, "raw_path": raw_path, "processed_path": processed_path}
     return {"done": True}
 
 @app.get("/image_id/{image_id}")
@@ -155,7 +155,30 @@ async def label_image(image_id: str, label: str, background_tasks: BackgroundTas
     label = label.upper()
     if not re.match(r"^[A-Z?]$", label):
         return {"error": "Invalid label"}, 400
+    if label == "?":
+        # delete the images
+        raw_path, processed_path = get_image_filepaths(image_id)
+        os.remove('.' + raw_path)
+        os.remove('.' + processed_path)
+        if image_id in app.state.labels:
+            del app.state.labels[image_id]
+        refresh_files(app)
+        return
     app.state.labels[image_id] = label
     # save labels as background task
     background_tasks.add_task(save_labels, app.state.labels)
     return {"status": "success"}
+
+@app.get("/images")
+async def get_images():
+    images = []
+    for image_id in app.state.image_ids:
+        raw_path, processed_path = get_image_filepaths(image_id)
+        label = app.state.labels.get(image_id)
+        images.append({
+            "image_id": image_id,
+            "raw_path": raw_path,
+            "processed_path": processed_path,
+            "label": label,
+        })
+    return {"images": images}

@@ -4,3 +4,10 @@ __pycache__
 *.pyd
 images/
 labels.json
+boggle_cnn.*
+.venv/
+static.zip
+trie_data.*
+words.txt
+words_alpha.txt
+notebook.ipynb
