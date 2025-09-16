@@ -2,12 +2,50 @@ import os
 import json
 import random
 from PIL import Image
+from attr import frozen
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms
+
+INPUT_SIZE = 32
+NUM_CLASSES = 31  # 26 letters + 5 extra (An, Er, He, In, Th)
+
+def get_index_to_letter_maps():
+    base_letters = [chr(i + 65) for i in range(26)]  # A-Z
+    extra_letters = ['AN', 'ER', 'HE', 'IN', 'TH']
+    all_letters = base_letters + extra_letters
+    index2letter = {i: letter for i, letter in enumerate(all_letters)}
+    letter2index = {letter.upper(): i for i, letter in enumerate(all_letters)}
+    return letter2index, index2letter
+
+
+@frozen
+class BoggleCNNConfig:
+    num_classes: int = NUM_CLASSES
+    conv1_out_channels: int = 32
+    conv1_kernel_size: int = 3
+    conv2_out_channels: int = 128
+    conv2_kernel_size: int = 3
+    pool_kernel_size: int = 2
+    fc1_out_features: int = 128
+
+@frozen
+class TrainingConfig:
+    batch_size: int = 64
+    learning_rate: float = 0.001
+    num_epochs: int = 30
+    patience: int = 5
+    val_split: float = 0.2
+
+@frozen
+class Config:
+    boggle_cnn: BoggleCNNConfig = BoggleCNNConfig()
+    training: TrainingConfig = TrainingConfig()
+    img_folder: str = "images"
+    labels_file: str = "labels.json"
 
 # ------------------------------
 # 1. Custom Dataset
@@ -21,8 +59,7 @@ class BoggleDataset(Dataset):
             self.labels = json.load(f)
 
         # Map letters to indices 0-25
-        self.letter2idx = {chr(i + 65): i for i in range(26)}
-        self.idx2letter = {i: chr(i + 65) for i in range(26)}
+        self.letter2idx, self.idx2letter = get_index_to_letter_maps()
 
         self.img_ids = list(self.labels.keys())
 
@@ -35,27 +72,29 @@ class BoggleDataset(Dataset):
         img_path = os.path.join(self.img_folder, img_name)
         image = Image.open(img_path).convert("L")  # grayscale
 
-        label = self.letter2idx[self.labels[image_id]]
+        label = self.letter2idx[self.labels[image_id].upper()]
 
         if self.transform:
             image = self.transform(image)
 
         return image, label
 
-
 class BoggleCNN(nn.Module):
-    def __init__(self):
+    def __init__(self, config):
         super(BoggleCNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
-        self.conv2 = nn.Conv2d(32, 128, 3, padding=1)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(128*8*8, 128)
-        self.fc2 = nn.Linear(128, 26)
+        self.config = config
+        self.conv1 = nn.Conv2d(1, config.conv1_out_channels, config.conv1_kernel_size, padding=1)
+        self.conv2 = nn.Conv2d(config.conv1_out_channels, config.conv2_out_channels, config.conv2_kernel_size, padding=1)
+        self.pool = nn.MaxPool2d(config.pool_kernel_size, config.pool_kernel_size)
+        pooled_size = INPUT_SIZE // (config.pool_kernel_size ** 2)
+        self.cnn_flattened_size = config.conv2_out_channels * pooled_size * pooled_size
+        self.fc1 = nn.Linear(self.cnn_flattened_size, config.fc1_out_features)
+        self.fc2 = nn.Linear(config.fc1_out_features, config.num_classes)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 128*8*8)
+        x = x.view(-1, self.cnn_flattened_size)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
         return x
@@ -63,11 +102,10 @@ class BoggleCNN(nn.Module):
 class RandomRotation90:
     def __call__(self, img: Image.Image):
         angles = [0, 90, 180, 270]
-        jitter = random.uniform(-5, 5)
         angle = random.choice(angles)
         return img.rotate(angle)
 
-def main():
+def main(config: Config):
     transform = transforms.Compose([
         transforms.Resize((32, 32)),
         RandomRotation90(),
@@ -75,27 +113,27 @@ def main():
         transforms.ToTensor()
     ])
 
-    dataset = BoggleDataset("images", "labels.json", transform=transform)
+    dataset = BoggleDataset(config.img_folder, config.labels_file, transform=transform)
 
-    train_size = int(0.8 * len(dataset))
+    train_size = int((1 - config.training.val_split) * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=64)
+    train_loader = DataLoader(train_dataset, batch_size=config.training.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=config.training.batch_size)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = BoggleCNN().to(device)
+    model = BoggleCNN(config.boggle_cnn).to(device)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=config.training.learning_rate)
 
     # ------------------------------
     # 4. Training Loop
     # ------------------------------
-    num_epochs = 30
+    num_epochs = config.training.num_epochs
+    patience = config.training.patience
     best_val_acc = 0
-    patience = 5   # how many epochs to wait before stopping
     counter = 0
 
     for epoch in range(num_epochs):
@@ -143,11 +181,11 @@ def main():
     # ------------------------------
     torch.save(model.state_dict(), "boggle_cnn.pth")
 
-    dummy_input = torch.randn(1, 1, 32, 32, device=device)
+    dummy_input = torch.randn(1, 1, INPUT_SIZE, INPUT_SIZE, device=device)
     torch.onnx.export(model, (dummy_input,), "boggle_cnn.onnx",
                     input_names=['input'], output_names=['output'],
                     dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
                     opset_version=11)
     
 if __name__=="__main__":
-    main()
+    main(config=Config())

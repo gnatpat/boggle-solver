@@ -39,34 +39,19 @@
                 <!-- choose between boggle (4x4) and big boggle (5x5)-->
                 <button id="start-camera">Start Camera</button>
                 <select id="boggle-size" disabled="true">
-                    <option value="4x4">Boggle (4x4)</option>
-                    <option value="5x5">Big Boggle (5x5)</option>
+                    <option value="4">Boggle (4x4)</option>
+                    <option value="5">Big Boggle (5x5)</option>
+                    <option value="1">DEBUG 1</option>
+                    <option value="2">DEBUG 2</option>
+                    <option value="3">DEBUG 3</option>
+
                 </select>
                 <button id="hard-reload" onclick="location.reload();" style="display: none;">Hard Reload</button>
             </div>
             <div class="video-container">
                 <video class="video-preview" autoplay muted playsinline webkit-playsinline></video>
                 <canvas class="snapshot-canvas" style="display: none;"></canvas>
-                <svg class="overlay4x4" display="none">
-                    <defs>
-                        <pattern id="grid" width="25%" height="25%" patternUnits="userSpaceOnUse">
-                            <rect width="100%" height="100%" fill="none" stroke="green" stroke-width="3" shape-rendering="crispEdges"/>
-                        </pattern>
-                    </defs>
-                    <rect x="0" y="0" width="100%" height="100%" fill="url(#grid)" />
-                    <line x1="100%" y1="0" x2="100%" y2="100%" stroke="green" stroke-width="3" />
-                    <line x1="0" y1="100%" x2="100%" y2="100%" stroke="green" stroke-width="3" />
-                </svg>
-                <svg class="overlay5x5" display="none">
-                    <defs>
-                        <pattern id="grid5x5" width="20%" height="20%" patternUnits="userSpaceOnUse">
-                            <rect width="100%" height="100%" fill="none" stroke="green" stroke-width="3" shape-rendering="crispEdges"/>
-                        </pattern>
-                    </defs>
-                    <rect x="0" y="0" width="100%" height="100%" fill="url(#grid5x5)" />
-                    <line x1="100%" y1="0" x2="100%" y2="100%" stroke="green" stroke-width="3" />
-                    <line x1="0" y1="100%" x2="100%" y2="100%" stroke="green" stroke-width="3" />
-                </svg>
+                <svg id="overlay" display="none"> </svg>
             </div>
             <div id="boggle-board-container">
                 <div id="boggle-board"></div>
@@ -81,6 +66,35 @@
                 <button id="solve-button">Find Words</button>
             </div>
             <div id="results">
+            </div>
+        </div>
+        <div id="keyboard-backdrop" class="hidden">
+            <div id="keyboard">
+                <div class="kb-row specials">
+                    <button>An</button>
+                    <button>Er</button>
+                    <button>He</button>
+                    <button>In</button>
+                    <button>Th</button>
+                    <button>Qu</button>
+                </div>
+                <div class="kb-row top-row">
+                    <button>Q</button><button>W</button><button>E</button>
+                    <button>R</button><button>T</button><button>Y</button>
+                    <button>U</button><button>I</button><button>O</button><button>P</button>
+                </div>
+                <div class="kb-row">
+                    <button>A</button><button>S</button><button>D</button>
+                    <button>F</button><button>G</button><button>H</button>
+                    <button>J</button><button>K</button><button>L</button>
+                </div>
+                <div class="kb-row">
+                    <button>Z</button><button>X</button><button>C</button>
+                    <button>V</button><button>B</button><button>N</button><button>M</button>
+                </div>
+                <div class="kb-row">
+                    <button id="cancel">Cancel</button>
+                </div>
             </div>
         </div>
         <details id="debug-info" style="display: none;">

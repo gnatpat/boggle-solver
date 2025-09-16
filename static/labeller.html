@@ -13,7 +13,9 @@
 
         #image {
             border: 1px solid #ccc;
-            max-width: 200px;
+            width: 80px;
+            /* aspect-ratio: 1/1; */
+            height: auto;
             display: block;
             margin-bottom: 10px;
         }
@@ -57,6 +59,10 @@
     <div id="imageAndLabel" class="image-and-label">
         <img id="image" src="" alt="letter" />
         <div id="entered" class="label"></div>
+    </div>
+
+    <div id="help">
+        An = 1, Er = 2, He = 3, In = 4, Th = 5
     </div>
 
     <div id="filename"></div>
@@ -126,8 +132,13 @@
             // if modifier key is pressed, ignore
             if (e.altKey || e.ctrlKey || e.metaKey) return;
             const k = e.key.toUpperCase();
-            if (/^[A-Z?]$/.test(k)) {
+            if (/^[A-Z1-5?]$/.test(k)) {
                 entered = k;
+                if (k === "1") entered = "AN";
+                if (k === "2") entered = "ER";
+                if (k === "3") entered = "HE";
+                if (k === "4") entered = "IN";
+                if (k === "5") entered = "TH";
                 document.querySelector("#entered").textContent = entered;
                 // send label after small delay
                 setTimeout(async () => {

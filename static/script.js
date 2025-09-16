@@ -6,15 +6,12 @@ let predictions = [];
 let trie = null;
 let boardSolved = false;
 let currentAnimation = null;
-
+let hideKeyboardCallback = null;
 
 function getMargin() {
     const size = getSelectedSize();
-    if (size === "4x4") {
-        return 0.15;
-    } else {
-        return 0.125;
-    }
+    const sizeDiff = 5 - size;
+    return Math.min(0.125 + 0.025 * (sizeDiff * sizeDiff), 0.4);
 }
 
 async function startCamera() {
@@ -43,21 +40,14 @@ async function startCamera() {
 
 function getSelectedSize() {
     const boggleSizeSelect = document.querySelector('#boggle-size');
-    return boggleSizeSelect.value;
+    // convert to int
+    return parseInt(boggleSizeSelect.value);
 }
 
 async function setupOverlay() {
     const selectedSize = getSelectedSize();
-    let overlay;
-    const overlay4x4 = document.querySelector('.overlay4x4');
-    const overlay5x5 = document.querySelector('.overlay5x5');
-    overlay4x4.style.display = "none";
-    overlay5x5.style.display = "none";
-    if (selectedSize === "4x4") {
-        overlay = overlay4x4;
-    } else {
-        overlay = overlay5x5;
-    }
+    const overlay = document.querySelector('#overlay');
+    makeGrid(overlay, selectedSize);
     const margin = getMargin();
     overlay.style.display = "block";
     overlay.style.width = `${(1 - 2 * margin) * 100}%`;
@@ -67,6 +57,49 @@ async function setupOverlay() {
     overlay.style.left = `${margin * 100}%`;
     overlay.style.pointerEvents = "none";
 }
+
+function makeGrid(svg, n, color = "green", strokeWidth = 1) {
+    svg.innerHTML = ""; // clear previous
+
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", 0);
+    rect.setAttribute("y", 0);
+    rect.setAttribute("width", "100%");
+    rect.setAttribute("height", "100%");
+    rect.setAttribute("fill", "none");
+    rect.setAttribute("stroke", color);
+    rect.setAttribute("stroke-width", strokeWidth * 2);
+    rect.setAttribute("shape-rendering", "crispEdges");
+
+    svg.appendChild(rect);
+
+    // draw vertical lines
+    for (let i = 0; i <= n; i++) {
+        const x = (i / n) * 100;
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", `${x}%`);
+        line.setAttribute("y1", "0%");
+        line.setAttribute("x2", `${x}%`);
+        line.setAttribute("y2", "100%");
+        line.setAttribute("stroke", color);
+        line.setAttribute("stroke-width", strokeWidth);
+        svg.appendChild(line);
+    }
+
+    // draw horizontal lines
+    for (let i = 0; i <= n; i++) {
+        const y = (i / n) * 100;
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", "0%");
+        line.setAttribute("y1", `${y}%`);
+        line.setAttribute("x2", "100%");
+        line.setAttribute("y2", `${y}%`);
+        line.setAttribute("stroke", color);
+        line.setAttribute("stroke-width", strokeWidth);
+        svg.appendChild(line);
+    }
+}
+
 
 function addDebugData(sectionDiv, sectionCanvas, data) {
     sectionDiv.appendChild(sectionCanvas);
@@ -130,8 +163,7 @@ async function captureOCR() {
     // First, split the image into 16 section (4 * 4 grid)
     const margin = getMargin() * size;
     const mainImageSize = size - 2 * margin;
-    const selectedSize = getSelectedSize();
-    const gridSize = selectedSize === "4x4" ? 4 : 5;
+    const gridSize = getSelectedSize();
     const sectionSize = mainImageSize / gridSize;
     const sectionData = [];
     for (let y = 0; y < gridSize; y++) {
@@ -225,6 +257,26 @@ function setSolveButtonState() {
     }
 }
 
+function indexToLetter(index) {
+    // A-Z, then An, Er, He, In, Th
+    // If index is Qu, return Qu
+    if (index == 16 /* Q */) {
+        return 'Qu';
+    } else if (index >= 0 && index < 26) {
+        return String.fromCharCode(65 + index);
+    } else if (index === 26) {
+        return 'An';
+    } else if (index === 27) {
+        return 'Er';
+    } else if (index === 28) {
+        return 'He';
+    } else if (index === 29) {
+        return 'In';
+    } else if (index === 30) {
+        return 'Th';
+    }
+}
+
 async function predictLetter(canvas) {
     if (!inferenceSession) {
         console.error("Model not loaded");
@@ -250,7 +302,7 @@ async function predictLetter(canvas) {
 
     // 5. Find predicted letter
     const predictedIndex = outputArray.indexOf(Math.max(...outputArray));
-    const predictedLetter = String.fromCharCode(65 + predictedIndex);
+    const predictedLetter = indexToLetter(predictedIndex);
 
     console.log("Predicted letter:", predictedLetter);
     return predictedLetter;
@@ -398,16 +450,13 @@ function updateOverlay() {
 function setTileText(tile, text, x, y, boardSize) {
     predictions[y * boardSize + x] = text;
     setSolveButtonState();
-    if (text == 'Q') {
-        text = 'Qu';
-    }
     const tileText = tile.querySelector('.tile-text');
     tileText.textContent = text;
 }
 
 function renderBoard() {
     console.log("Rendering board with predictions:", predictions);
-    const gridSize = getSelectedSize() === "4x4" ? 4 : 5;
+    const gridSize = getSelectedSize();
     const board = document.querySelector('#boggle-board');
     board.innerHTML = ''; // Clear previous content
     board.style.display = "grid";
@@ -432,51 +481,26 @@ function renderBoard() {
         tile.onclick = () => {
             clearHighlightedWord();
             tileText.textContent = '';
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.maxLength = 1;
-            input.className = 'tile-input';
-            input.onblur = () => {
-                let val = input.value.toUpperCase();
-                if (val.length === 1 && val >= 'A' && val <= 'Z') {
-                    setTileText(tile, val, x, y, gridSize);
-                    predictions[y * gridSize + x] = val;
-                    if (boardSolved) {
-                        document.querySelector('#results').innerHTML = '';
-                        solveBoard();
-                    }
-                } else {
+            const keyboardLetterClick = (letter) => {
+                setTileText(tile, letter, x, y, gridSize);
+                if (boardSolved) {
+                    document.querySelector('#results').innerHTML = '';
+                    solveBoard();
+                }
+            };
+            const hideKeyboardFunc = () => {
+                const val = tileText.textContent;
+                if (val.length === 0) {
                     setTileText(tile, predictions[y * gridSize + x], x, y, gridSize);
                 }
-                console.log('removing');
-                tile.removeChild(input);
             };
-            input.onkeydown = (event) => {
-                console.log(event);
-                if (event.key === 'Enter' || event.key === 'Escape') {
-                    input.blur();
-                    event.preventDefault();
-                }
-            };
-            input.onkeyup = (event) => {
-                console.log(input.value);
-                console.log(tile.textContent);
-                let val = input.value.toUpperCase();
-                if (val.length === 1 && val >= 'A' && val <= 'Z') {
-                    input.blur();
-                } else {
-                    input.value = '';
-                }
-            }
-            tile.appendChild(input);
-            input.focus();
-            if (!boardSolved) {
-                input.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-                // scroll into view after a short delay to allow for rendering
-                setTimeout(() => {
-                    input.scrollIntoView({ block: "center", inline: "center" });
-                }, 100);
-            }
+            openKeyboard(keyboardLetterClick, hideKeyboardFunc);
+            // scroll tile into view. Use two requestAnimationFrame to ensure keyboard is shown first
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    tile.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                });
+            });
         };
         console.log(x, y, prediction);
     }
@@ -512,38 +536,35 @@ async function loadTrie() {
 }
 
 function getChild(node, char) {
-    if (char === 'q') {
-        if (node['q'] && node['q']['u']) {
-            return node['q']['u'];
-        } else {
+    let currentNode = node;
+    for (const c of char) {
+        currentNode = currentNode[c];
+        if (!currentNode) {
             return null;
         }
-    } else {
-        return node[char];
     }
+    return currentNode;
 }
 
 function findAllWords(board, trie, boardSize) {
     const directions = [
         [-1, -1], [-1, 0], [-1, 1],
-        [0, -1], [0, 1],
-        [1, -1], [1, 0], [1, 1]
+        [ 0, -1],          [ 0, 1],
+        [ 1, -1], [ 1, 0], [ 1, 1]
     ];
 
     const foundWords = [];
 
     function search(x, y, currentWord, node, visited, route) {
-        const letter = board[y][x].toLowerCase();
-        const childNode = getChild(node, letter);
+        const die = board[y][x].toLowerCase();
+        // letter may be two letters (e.g. 'qu')
+        const childNode = getChild(node, die);
         if (!childNode) {
             return;
         }
         visited.add(`${x},${y}`);
         route.push([x, y]);
-        currentWord += letter;
-        if (letter === 'q') {
-            currentWord += 'u';
-        }
+        currentWord += die;
         if ('$' in childNode) {
             foundWords.push({ word: currentWord, path: route.slice() });
         }
@@ -679,7 +700,7 @@ function hidePathCanvas() {
 }
 
 function solveBoard() {
-    const gridSize = getSelectedSize() === "4x4" ? 4 : 5;
+    const gridSize = getSelectedSize();
     if (predictions.length !== gridSize * gridSize) {
         console.error("Predictions length does not match grid size");
         return;
@@ -939,9 +960,86 @@ function visibilityChange() {
     }
 }
 
+function openKeyboard(letterOnClick, hideKeyboardFunc) {
+    const backdrop = document.getElementById('keyboard-backdrop');
+    const keyboard = document.getElementById('keyboard');
+    backdrop.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        keyboard.classList.add("show");
+        const kbHeight = keyboard.offsetHeight;
+        document.body.style.paddingBottom = kbHeight + "px";
+        // set animation on document body to match keyboard transition
+        document.body.style.transition = "padding-bottom 0s ease";
+        requestAnimationFrame(() => {
+            equalizeKeyWidths();
+        });
+    });
+    document.querySelectorAll('#keyboard button').forEach(btn => {
+        // ignore buttons with id cancel
+        if (btn.id === 'cancel') return;
+        btn.onclick = () => {
+            let value = btn.textContent;
+            if (value === 'Q') value = 'Qu';
+            letterOnClick(value);
+            hideKeyboard();
+        };
+    });
+    hideKeyboardCallback = hideKeyboardFunc;
+}
+
+function hideKeyboard() {
+    const backdrop = document.getElementById('keyboard-backdrop');
+    const keyboard = document.getElementById('keyboard');
+    keyboard.classList.remove("show");
+    // clear body padding after transition
+    document.body.style.transition = "padding-bottom 0.3s ease";
+    document.body.style.paddingBottom = null;
+    keyboard.addEventListener('transitionend', () => {
+        backdrop.classList.add('hidden');
+    }, { once: true });
+    if (hideKeyboardCallback) {
+        hideKeyboardCallback();
+        hideKeyboardCallback = null;
+    }
+}
+
+
+function equalizeKeyWidths() {
+    console.log("Equalizing key widths");
+    // find the QWERTY row (10 keys)
+    const qwertyRow = document.querySelector('.kb-row.top-row');
+    if (!qwertyRow) return;
+
+    const qwertyButtons = qwertyRow.querySelectorAll('button');
+    if (qwertyButtons.length === 0) return;
+
+    // measure one button’s width
+    const keyWidth = qwertyButtons[0].getBoundingClientRect().width;
+
+    // apply to all buttons
+    document.querySelectorAll('#keyboard button').forEach(btn => {
+        // ignore buttons with id cancel
+        if (btn.id === 'cancel') return;
+        // ignore top row buttons
+        if (btn.parentElement.classList.contains('top-row')) return;
+        // ignore special keys
+        if (btn.parentElement.classList.contains('specials')) return;
+        btn.style.flex = `0 0 ${keyWidth}px`;
+    });
+
+    // if the keyboard is visible, adjust body padding
+    const keyboard = document.getElementById('keyboard');
+    if (keyboard.classList.contains('show')) {
+        const kbHeight = keyboard.offsetHeight;
+        document.body.style.paddingBottom = kbHeight + "px";
+    }
+}
+window.addEventListener('resize', equalizeKeyWidths);
+equalizeKeyWidths();
 document.addEventListener('visibilitychange', visibilityChange);
 
 window.onload = async function () {
+    equalizeKeyWidths();
     document.querySelector('#start-camera').onclick = startCamera;
     document.querySelector('#capture-ocr').onclick = captureOCR;
     document.querySelector('#boggle-size').onchange = updateOverlay;
@@ -952,7 +1050,20 @@ window.onload = async function () {
     document.querySelector('#pause-timer').onclick = pauseTimer;
     document.querySelector('#reset-timer').onclick = resetTimer;
     document.querySelector('#resume-timer').onclick = resumeTimer;
+    document.querySelector("#cancel").addEventListener("click", hideKeyboard);
+    document.querySelector('#keyboard-backdrop').addEventListener('click', hideKeyboard);
+
+    if (DEBUG) {
+        const hardReloadButton = document.querySelector('#hard-reload');
+        hardReloadButton.style.display = 'inline-block';
+        hardReloadButton.onclick = () => {
+            // clear cache and hard reload
+            location.reload(true);
+        };
+
+    }
     resetTimer();
     await loadModel();
     trie = await loadTrie();
+
 }

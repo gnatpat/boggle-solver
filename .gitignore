@@ -3,6 +3,7 @@ __pycache__
 *.pyo
 *.pyd
 images/
+unlabelled/
 labels.json
 boggle_cnn.*
 .venv/

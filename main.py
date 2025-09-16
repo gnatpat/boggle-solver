@@ -95,8 +95,9 @@ async def upload_images(request: Request):
         else:
             pairs[cube_id].processed = value
 
+    board_id = uuid.uuid4().hex
     for cube_id, pair in pairs.items():
-        new_id = uuid.uuid4().hex
+        new_id = f"{board_id}_{cube_id}"
         if not pair.raw or not pair.processed:
             continue
         raw_filename = f"{new_id}_raw.png"
@@ -153,7 +154,7 @@ async def label_image(image_id: str, label: str, background_tasks: BackgroundTas
         return {"error": "Image not found"}, 404
     # ensure label is A-Z and ? in uppercase
     label = label.upper()
-    if not re.match(r"^[A-Z?]$", label):
+    if not re.match(r"^[A-Z?]|AN|ER|HE|IN|TH$", label):
         return {"error": "Invalid label"}, 400
     if label == "?":
         # delete the images
