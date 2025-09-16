@@ -3,10 +3,12 @@ const GLYPH_SIZE = 32;
 const DEBUG = false;
 const DATA_COLLECTION = false;
 let predictions = [];
-let trie = null;
 let boardSolved = false;
 let currentAnimation = null;
 let hideKeyboardCallback = null;
+let spellingOptions = [];
+let sizeOptions = [];
+let loadedTries = {};
 
 function getMargin() {
     const size = getSelectedSize();
@@ -31,6 +33,7 @@ async function startCamera() {
     document.querySelector('#debug-info').innerHTML = '';
     document.querySelector('#boggle-board').innerHTML = '';
     document.querySelector('#results').innerHTML = '';
+    document.querySelector('#post-board-controls').style.display = "none";
     document.querySelector('#solve-button-container').style.display = "none";
     document.querySelector('#boggle-board').style.display = "none";
     clearHighlightedWord();
@@ -226,6 +229,7 @@ async function captureOCR() {
     document.querySelector('.snapshot-canvas').style.display = "block";
     document.querySelector('.video-preview').style.display = "none";
     document.querySelector('#boggle-size').disabled = true;
+    document.querySelector('#post-board-controls').style.display = "block";
     document.querySelector('#solve-button-container').style.display = "block";
     document.querySelector('#solve-button').disabled = false;
 
@@ -234,7 +238,7 @@ async function captureOCR() {
     solveButton = document.querySelector('#solve-button');
     setSolveButtonState();
     solveButton.onclick = async () => {
-        if (!trie) {
+        if (!getCurrentTrie()) {
             console.error("Trie not loaded");
             return;
         }
@@ -462,10 +466,8 @@ function renderBoard() {
     board.style.display = "grid";
     board.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
     board.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
-    console.log(predictions.entries());
     for (let index = 0; index < predictions.length; index++) {
         const prediction = predictions[index];
-        console.log(index, prediction);
         const x = index % gridSize;
         const y = Math.floor(index / gridSize);
         const tile = document.createElement('div');
@@ -502,7 +504,6 @@ function renderBoard() {
                 });
             });
         };
-        console.log(x, y, prediction);
     }
 
     // Set font size based on cell width
@@ -709,9 +710,7 @@ function solveBoard() {
     for (let i = 0; i < gridSize; i++) {
         board.push(predictions.slice(i * gridSize, (i + 1) * gridSize));
     }
-    console.log(board);
-    const foundWords = findAllWords(board, trie, gridSize);
-    console.log("Found words:", foundWords);
+    const foundWords = findAllWords(board, getCurrentTrie(), gridSize);
     // group by length
     const grouped = {};
     Object.entries(foundWords).forEach(([word, path]) => {
@@ -725,7 +724,6 @@ function solveBoard() {
     for (const len in grouped) {
         grouped[len].sort((a, b) => a.word.localeCompare(b.word));
     }
-    console.log("Grouped words:", grouped);
     const sizes = Object.keys(grouped).sort((a, b) => b - a);
     const resultsDiv = document.querySelector('#results');
     resultsDiv.innerHTML = '';
@@ -841,10 +839,8 @@ async function requestWakeLock() {
             wakeLock = await navigator.wakeLock.request('screen');
             shouldHaveWakeLock = true;
             wakeLock.addEventListener('release', () => {
-                console.log('Wake Lock was released');
                 wakeLock = null;
             });
-            console.log('Wake Lock is active');
         } catch (err) {
             console.error(`${err.name}, ${err.message}`);
         }
@@ -859,9 +855,7 @@ async function releaseWakeLock() {
             await wakeLock.release();
             wakeLock = null;
             shouldHaveWakeLock = false;
-            console.log('Wake Lock released');
         } catch (err) {
-            console.error('Error releasing Wake Lock:', err);
         }
     }
 }
@@ -1005,7 +999,6 @@ function hideKeyboard() {
 
 
 function equalizeKeyWidths() {
-    console.log("Equalizing key widths");
     // find the QWERTY row (10 keys)
     const qwertyRow = document.querySelector('.kb-row.top-row');
     if (!qwertyRow) return;
@@ -1034,6 +1027,110 @@ function equalizeKeyWidths() {
         document.body.style.paddingBottom = kbHeight + "px";
     }
 }
+
+// Sizes for word list size (smaller is more common words, larger is more words)
+const SIZE_OPTION_LABELS = [
+    'Small',
+    'Medium',
+    'Large',
+    'Extra Large',
+    'Gigantic'
+]
+
+async function loadTrieMetadata() {
+    let metadata;
+    try {
+        const response = await fetch('tries/metadata.json');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        metadata = await response.json();
+    } catch (error) {
+        console.error("Error loading trie metadata:", error);
+        return;
+    }
+    spellingOptions = metadata['spellings'];
+    sizeOptions = metadata['sizes'];
+    const spellingSelect = document.querySelector('#spelling-select');
+    const sizeSelect = document.querySelector('#size-select');
+    spellingOptions.forEach(spelling => {
+        const option = document.createElement('option');
+        // Capitalize first letter
+        const displaySpelling = spelling.charAt(0).toUpperCase() + spelling.slice(1);
+        option.value = spelling;
+        option.textContent = displaySpelling;
+        spellingSelect.appendChild(option);
+    });
+    sizeOptions.forEach((size, index) => {
+        const option = document.createElement('option');
+        const label = SIZE_OPTION_LABELS[index] || `Size ${size}`;
+        option.value = size;
+        option.textContent = label;
+        sizeSelect.appendChild(option);
+    });
+    spellingSelect.onchange = trieSelectionChanged;
+    sizeSelect.onchange = trieSelectionChanged;
+}
+
+async function trieSelectionChanged() {
+    const spelling = document.querySelector('#spelling-select').value;
+    const size = document.querySelector('#size-select').value;
+    const key = `${spelling}_${size}`;
+    if (boardSolved) {
+        clearHighlightedWord();
+        document.querySelector('#results').innerHTML = '';
+    }
+    if (loadedTries[key]) {
+        trie = loadedTries[key];
+    } else {
+        trie = await loadTrie(spelling, size);
+    }
+    if (boardSolved) {
+        solveBoard();
+    }
+}
+
+async function loadTrie(spelling, size) {
+    const spellingSelect = document.querySelector('#spelling-select');
+    const sizeSelect = document.querySelector('#size-select');
+    spellingSelect.disabled = true;
+    sizeSelect.disabled = true;
+    console.log("Loading trie:", spelling, size);
+    document.querySelector('#loading-indicator').style.display = 'block';
+    const trie_file = `tries/${spelling}_${size}.txt.json.gz`;
+    try {
+        const trieData = await fetchAndDecompressJSON(trie_file);
+        loadedTries[`${spelling}_${size}`] = trieData;
+    } catch (error) {
+        console.error("Error loading trie:", error);
+        return null;
+    } finally {
+        document.querySelector('#loading-indicator').style.display = 'none';
+        spellingSelect.disabled = false;
+        sizeSelect.disabled = false;
+    }
+}
+
+async function loadInitialTrie() {
+    if (spellingOptions.length === 0 || sizeOptions.length === 0) {
+        console.error("No spelling or size options available");
+        return null;
+    }
+    const spelling = spellingOptions[1];
+    const middleIndex = Math.floor(sizeOptions.length / 2);
+    const size = sizeOptions[middleIndex];
+    document.querySelector('#spelling-select').value = spelling;
+    document.querySelector('#size-select').value = size;
+    console.log("Loading initial trie:", spelling, size);
+    return await loadTrie(spelling, size);
+}
+
+function getCurrentTrie() {
+    const spelling = document.querySelector('#spelling-select').value;
+    const size = document.querySelector('#size-select').value;
+    return loadedTries[`${spelling}_${size}`];
+}
+
 window.addEventListener('resize', equalizeKeyWidths);
 equalizeKeyWidths();
 document.addEventListener('visibilitychange', visibilityChange);
@@ -1064,6 +1161,6 @@ window.onload = async function () {
     }
     resetTimer();
     await loadModel();
-    trie = await loadTrie();
-
+    await loadTrieMetadata();
+    await loadInitialTrie();
 }

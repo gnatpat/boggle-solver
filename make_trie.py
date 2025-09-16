@@ -1,6 +1,7 @@
 import json
 import os
 import gzip
+import shutil
 
 WORD_MARKER = 26
 RETURN_MARKER = 27
@@ -90,20 +91,33 @@ def write_to_gzipped_file(data: bytearray, filepath: str):
     # print file size
     print(f"Wrote {os.path.getsize(filepath)} bytes to {filepath}")
 
-def main():
-    words = list(load_words("words_alpha.txt"))
+WORDLIST_PATH = "wordlists/"
+OUTPUT_DIR = "static/tries/"
+
+def make_trie(output_dir: str, name: str):
+    path = os.path.join(WORDLIST_PATH, name)
+    if not os.path.isfile(path):
+        raise ValueError(f"Word list file {path} does not exist.")
+    words = list(load_words(path))
     trie = TrieNode()
     for word in words:
         trie.add_word(word)
-    compact_repr = trie.to_compact_repr()
-    print(f"Total words: {len(words)}")
-    print(f"Trie size (bytes): {len(compact_repr)}")
-    print(f"Preview: {bytes_to_debug_string(compact_repr[:100])}")
-
-    write_to_gzipped_file(compact_repr, "trie_data.gz")
-
     json_repr = json.dumps(trie.to_dict())
-    write_to_gzipped_file(bytearray(json_repr, 'utf-8'), "trie_data.json.gz")
+    output_path = os.path.join(output_dir, f"{name}.json.gz")
+    write_to_gzipped_file(bytearray(json_repr, 'utf-8'), output_path)
+
+def main():
+    os.makedirs('tries', exist_ok=True)
+    # Generate tries for all word lists in the wordlists directory
+    for filename in os.listdir(WORDLIST_PATH):
+        if filename.endswith('.txt'):
+            print(f"Generating trie for {filename}...")
+            make_trie('tries', filename)
+            print(f"Trie for {filename} generated.")
+    # copy metadata.json to tries directory
+    if os.path.isfile(os.path.join(WORDLIST_PATH, 'metadata.json')):
+        shutil.copyfile(os.path.join(WORDLIST_PATH, 'metadata.json'), os.path.join('tries', 'metadata.json'))
+
 
 if __name__ == "__main__":
     main()

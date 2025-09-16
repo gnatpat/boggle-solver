@@ -8,8 +8,9 @@ labels.json
 boggle_cnn.*
 .venv/
 static.zip
-trie_data.*
+static/tries/
 words.txt
 words_alpha.txt
 notebook.ipynb
 release.sh
+wordlists/

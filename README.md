@@ -53,7 +53,9 @@ In order to run, the app requires:
 1. A trained letter recognition model in ONNX format, named `boggle_cnn.onnx` in the `static/` directory. You can:
     - train your own using the code in `train_model.py` (see the Training section below) - contact me (find my email on e.g. my website) if you want the dataset used to train
     - download the model [here](http://natpat.net/boggle/boggle_cnn.onnx)
-2. A list of words compiled into a trie, saved as `trie_data.json.gz` in `static/`. You can generate this file using the `make_trie.py` script. The `make_trie.py` script expects a text file containing a list of words, one per line at `words.txt` in the root directory. 
+2. At least one trie file in `static/tries/`, along with a metadata file
+    - these can be generated using the code in `make_word_lsit.py` and `generate_tries.py` - this also assumes you have a copy of [SCOWL](http://wordlist.aspell.net/) downloaded
+    - or contact me if you want the tries I generated
 
 ### Training the Model
 
