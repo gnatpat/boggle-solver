@@ -1157,7 +1157,14 @@ window.onload = async function () {
             // clear cache and hard reload
             location.reload(true);
         };
-
+        const boggleSizeSelect = document.querySelector('#boggle-size');
+        // add 1x1, 2x2 and 3x3 options
+        [1, 2, 3].forEach(size => {
+            const option = document.createElement('option');
+            option.value = size;
+            option.textContent = `${size} x ${size}`;
+            boggleSizeSelect.appendChild(option);
+        });
     }
     resetTimer();
     await loadModel();
