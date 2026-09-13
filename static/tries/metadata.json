@@ -1,0 +1,18 @@
+{
+    "sizes": [
+        35,
+        40,
+        50,
+        55,
+        60
+    ],
+    "spellings": [
+        "american",
+        "british",
+        "canadian",
+        "australian"
+    ],
+    "min_length": 3,
+    "max_length": 25,
+    "include_variants": true
+}

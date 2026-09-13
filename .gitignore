@@ -5,10 +5,9 @@ __pycache__
 images/
 unlabelled/
 labels.json
-boggle_cnn.*
+/boggle_cnn.*
 .venv/
 static.zip
-static/tries/
 words.txt
 words_alpha.txt
 notebook.ipynb
