@@ -1,0 +1,14 @@
+# Deployment config for npd — https://github.com/gnatpat/npd
+
+[app]
+name = "boggle"
+type = "static"
+
+# No build steps: the site is the plain files in static/. The model and the
+# word-list tries are generated offline (they need the training images and
+# SCOWL word lists, which aren't in git) and committed as built artifacts.
+[build]
+output = "static"
+
+[nginx]
+path = "/boggle/"
