@@ -13,3 +13,5 @@ words_alpha.txt
 notebook.ipynb
 release.sh
 wordlists/
+# Secrets for `npd dev`
+.env
