@@ -1,0 +1,12 @@
+# Redeploys boggle on natpat.net after a push to main.
+# See "Deploy on push" in https://github.com/gnatpat/npd
+name: deploy
+on: [push, workflow_dispatch]
+jobs:
+  deploy:
+    uses: gnatpat/npd/.github/workflows/deploy.yml@main
+    with:
+      app: boggle
+      server: nathan@natpat.net
+      host_key: natpat.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICceDEju5ZpJJptHYCPzzBsTWmb9UczxmBqGpQfQMHL8
+    secrets: inherit
